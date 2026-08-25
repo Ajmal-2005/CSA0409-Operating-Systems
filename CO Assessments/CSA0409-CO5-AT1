@@ -1,0 +1,289 @@
+                                                          SIMATS ENGINEERING
+                                                        CO5 - ASSESSMENT TOOL 1
+Name: Ajmal Rahman A
+Register Number: 192324094
+Date: 25/08/2026
+Course Code: CSA0409
+Course Name: Operating Systems
+
+
+1. Optimized Linux File System Layout - 50 GB
+
+Problem Analysis
+
+The server has only 50 GB of storage, while system logs, user files, and application data are expected to grow continuously. If all these files are stored in a single partition, growing log files may eventually consume the space required by the operating system.
+
+Therefore, the storage should be divided into separate partitions so that the growth of one type of data does not affect the entire system.
+
+Proposed Partition Layout
+
+Partition    Size    Purpose
+
+/            12 GB   Linux operating system and system files
+/var         10 GB   System logs and application data
+/home        12 GB   User files
+/opt          8 GB   Application software
+Swap          4 GB   Virtual memory
+Free Space    4 GB   Emergency or reserved storage
+
+Total         50 GB
+
+Storage Management
+
+* Keep /var as a separate partition because system logs are mainly stored there.
+* Use LVM (Logical Volume Manager) so storage can be resized when required.
+* Configure logrotate to automatically rotate old log files.
+* Compress older logs to reduce disk usage.
+* Set a maximum log storage limit of 10 GB.
+* Keep some disk space free for emergency situations.
+* Monitor disk usage regularly using df and du.
+
+Log Rotation Configuration
+
+```text
+/var/log/*.log {
+    daily
+    rotate 7
+    compress
+    size 1G
+    missingok
+    notifempty
+}
+```
+
+This configuration rotates logs daily and also rotates them when the file reaches 1 GB.
+
+Result
+
+By separating /var, using LVM, and applying log rotation, the system can control log growth and prevent the entire disk from becoming full. This helps critical services continue running even when log files increase rapidly.
+
+
+
+
+2. Kernel-Level Optimization for High CPU Workloads
+
+Problem Analysis
+
+The Linux system is experiencing frequent context switching because of heavy CPU workloads. Context switching creates additional CPU overhead and can reduce the performance of real-time applications.
+
+Since hardware upgrades are not possible, the problem should be handled through kernel and scheduler-level optimization.
+
+Optimization Techniques
+
+  (i) Scheduler Tuning
+  
+  Linux scheduling policies can be adjusted according to the type of workload. Real-time applications can use scheduling policies such as SCHED_FIFO and SCHED_RR.
+  
+  Process priority can also be modified using nice and renice.
+  
+  (ii) CPU Affinity
+  
+  CPU affinity can be used to assign an important process to a particular CPU core. This reduces unnecessary movement of processes between cores.
+  
+  Example:
+  
+  ```bash
+  taskset -cp 2 <PID>
+  ```
+  
+  (iii) Process Priority
+  
+  The priority of a process can be changed using:
+  
+  ```bash
+  renice -10 -p <PID>
+  ```
+  
+  This can give an important process more CPU priority.
+  
+  (iv) Reduce Background Activity
+  
+  Unnecessary background services and processes should be disabled because they consume CPU time and increase scheduling overhead.
+  
+  (v) Real-Time Kernel
+  
+  A PREEMPT_RT kernel can be considered when the system requires low and predictable scheduling latency.
+  
+  (vi) Kernel Modules
+  
+  Only required kernel modules should be loaded. Unnecessary modules can be removed to reduce unnecessary kernel activity.
+
+Monitoring Commands
+
+```bash
+pidstat -w 1
+mpstat -P ALL 1
+```
+
+These commands help monitor context switching and CPU utilization.
+
+Result
+
+Using scheduler tuning, CPU affinity, process prioritization, and suitable kernel configuration can reduce unnecessary context switching and improve the response time of real-time workloads without requiring hardware upgrades.
+
+
+
+3. Processing 1 Million Log Entries Within 2 Minutes
+
+Problem Analysis
+
+Processing one million log entries is a large workload. A simple shell loop that processes each line separately can be slow because it repeatedly starts commands.
+
+Therefore, optimized Linux utilities should be combined using pipelines.
+
+Efficient Approach
+
+For example, to extract and count IP addresses from a log file:
+
+```bash
+awk '{print $1}' access.log | sort -S 1G | uniq -c | sort -nr
+```
+
+Explanation of Commands
+
+* awk extracts the required field efficiently in one pass.
+* sort organizes a large amount of data efficiently.
+* uniq -c counts repeated entries.
+* sort -nr sorts the final result in descending numerical order.
+* Pipelines reduce the need for unnecessary intermediate files.
+
+For finding the number of error messages:
+
+```bash
+grep -F "ERROR" access.log | wc -l
+```
+
+Execution time can be measured using:
+
+```bash
+time ./process_logs.sh
+```
+
+Performance Improvements
+
+* Avoid while read loops for processing every record individually.
+* Use awk instead of multiple commands for simple field extraction.
+* Use grep -F for fixed-string searches.
+* Use pipelines instead of creating temporary files.
+* Use parallel processing when log files can be processed independently.
+
+Result
+
+Using optimized native Linux commands reduces processing overhead and improves performance significantly compared with line-by-line shell scripting. This approach is suitable for processing one million records and targeting the required 2-minute execution time, depending on available CPU, RAM, and storage performance.
+
+
+
+4. Managing a Faulty High-CPU Process
+
+Problem Analysis
+
+A faulty background process is consuming around 90% of the CPU. Immediately restarting the system is not desirable because critical services must continue running.
+
+The process should therefore be identified, monitored, and controlled without affecting important services.
+
+Step 1: Identify the Process
+
+Use:
+
+```bash
+ps aux --sort=-%cpu | head
+```
+
+The top command can also be used to monitor CPU usage in real time.
+
+Step 2: Monitor the Process
+
+After obtaining the PID, use pidstat to check whether the high CPU usage is continuous.
+
+Step 3: Reduce Process Priority
+
+If the process is not critical, its priority can be reduced:
+
+```bash
+renice +10 -p <PID>
+```
+
+This allows more CPU time to be available for critical services.
+
+Step 4: Restrict CPU Usage
+
+CPU affinity or Linux cgroups can be used to restrict the CPU resources available to the faulty process.
+
+This prevents it from consuming all available CPU resources.
+
+Step 5: Terminate if Required
+
+If the process continues to cause problems, first attempt a graceful termination:
+
+```bash
+kill -TERM <PID>
+```
+
+A forceful termination should only be considered if the process does not respond.
+
+Process Management Strategy
+
+Identify → Monitor → Reduce Priority → Limit CPU Usage → Terminate if Necessary
+
+Result
+
+This strategy allows the administrator to control the faulty process without rebooting the server. Critical services remain unaffected as much as possible, while CPU resources are recovered gradually.
+
+
+
+5. Virtualization Resource Allocation – 16 GB RAM
+
+Problem Analysis
+
+The physical server has 16 GB of RAM. There are five virtual machines, and each VM requires a minimum of 2 GB. The host operating system requires 4 GB.
+
+Memory Calculation
+
+```text
+Host OS = 4 GB
+
+5 VMs × 2 GB = 10 GB
+
+Total Required = 4 + 10
+               = 14 GB
+
+Remaining Memory = 16 - 14
+                 = 2 GB
+```
+
+Proposed Allocation
+
+Resource       RAM
+
+Host OS         4 GB
+VM 1            2 GB
+VM 2            2 GB
+VM 3            2 GB
+VM 4            2 GB
+VM 5            2 GB
+Reserved Buffer 2 GB
+
+Total           16 GB
+
+Resource Management Strategy
+
+* Allocate 2 GB minimum to each VM.
+* Reserve 4 GB for the host operating system and virtualization software.
+* Keep the remaining 2 GB as a safety buffer.
+* Use memory ballooning or dynamic memory allocation when supported.
+* Monitor memory usage regularly.
+* Avoid excessive memory overcommitment.
+* Allocate additional memory temporarily to a VM if sufficient unused memory is available.
+
+Advantages
+
+* All five VMs receive their minimum memory requirement.
+* The host has enough memory to remain stable.
+* The 2 GB reserve provides flexibility during temporary workload increases.
+* Proper memory management reduces the possibility of swapping and performance degradation.
+
+Result
+
+The proposed allocation satisfies the minimum requirements of all five virtual machines while maintaining sufficient memory for the host system. The additional 2 GB buffer provides flexibility and helps prevent memory exhaustion during unexpected workload increases.
+
+
